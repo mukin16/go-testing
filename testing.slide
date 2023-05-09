@@ -1,0 +1,257 @@
+Testing
+22 June 2023
+
+Mukin Nikolay
+https://t.me/maybe_nick
+# @maybe_nick
+
+* What is testing
+TODO: rephrase
+
+- Testing consists in executing a given program choosing some input datas and evaluating the correctness of the results.
+- Testing is maximizing the possibilty of detecting errors
+
+.image images/dijkstra.png 300 1000
+# Program testing can be used to show the presence of bugs, but never to show their absence 
+# Dijkstra 1972 
+
+* Why should we test code?
+Pros:
+
+- Checks code logic, finds bugs
+- Makes developers feel safer
+- Faster new features coding
+- Code documentation
+
+Cons:
+
+- Time investment
+- Bad tests make development harder
+
+#.image fire.jpeg _ 250
+
+* Wast classification and naming
+- Unit tests
+- Integration tests
+- Functional tests
+- End-to-end tests
+- Acceptance testing
+- Performance testing
+- Smoke testing
+- Contract tests
+- Regression tests
+- ...
+
+* Mike Cohn pyramid
+.image images/pyramid.webp _ 705
+
+* Test size
+.image images/google.png _ 500
+https://testing.googleblog.com/2010/12/test-sizes.html
+
+* Plan
+- Linters and formatters
+- Unit tests
+- Service tests
+- End-to-end tests
+
+* Linters and formatters
+TODO
+go vet
+gofmt
+golint
+golangci-lint
+
+* System example
+TODO: picture to show difference in unit, service and end-to-end tests
+
+* Unit tests
+TODO: picture
+
+* Go details
+go test
+_test.go files
+func TestXXX(testing.T)
+
+* Test
+TODO: palindrome
+
+* Table tests
+TODO: palindrome
+
+* Go HTTP client unit test 
+go/src/net/http/client_test.go
+
+    func TestStripPasswordFromError(t *testing.T) {
+        client := &Client{Transport: &recordingTransport{}}
+        testCases := []struct {
+            desc string
+            in   string
+            out  string
+        }{
+            // ...
+        }
+        for _, tC := range testCases {
+            t.Run(tC.desc, func(t *testing.T) {
+                _, err := client.Get(tC.in)
+                if err.Error() != tC.out {
+                    t.Errorf("Unexpected output for %q: expected %q, actual %q",
+                        tC.in, tC.out, err.Error())
+                }
+            })
+        }
+    }
+
+* Go HTTP client unit test cases
+
+    {
+        {
+            desc: "Strip password from error message",
+            in:   "http://user:password@dummy.faketld/",
+            out:  `Get "http://user:***@dummy.faketld/": dummy impl`,
+        },
+        {
+            desc: "Don't Strip password from domain name",
+            in:   "http://user:password@password.faketld/",
+            out:  `Get "http://user:***@password.faketld/": dummy impl`,
+        },
+        {
+            desc: "Don't Strip password from path",
+            in:   "http://user:password@dummy.faketld/password",
+            out:  `Get "http://user:***@dummy.faketld/password": dummy impl`,
+        },
+        {
+            desc: "Strip escaped password",
+            in:   "http://user:pa%2Fssword@dummy.faketld/",
+            out:  `Get "http://user:***@dummy.faketld/": dummy impl`,
+        },
+    }
+
+* Testify
+TODO: assert/require instead of t.Error/t.Fatal
+https://github.com/stretchr/testify
+
+* Benchmarks
+
+go/src/net/http/server_test.go
+
+    func BenchmarkServerMatch(b *testing.B) {
+        fn := func(w ResponseWriter, r *Request) {
+            fmt.Fprintf(w, "OK")
+        }
+        mux := NewServeMux()
+        mux.HandleFunc("/", fn)
+        mux.HandleFunc("/index", fn)
+        mux.HandleFunc("/home", fn)
+        // ...
+        mux.HandleFunc("/admin/products/delete", fn)
+
+        paths := []string{"/", "/notfound", "/admin/", "/admin/foo", "/contact", "/products",
+            "/products/", "/products/3/image.jpg"}
+        b.StartTimer()
+        for i := 0; i < b.N; i++ {
+            if h, p := mux.match(paths[i%len(paths)]); h != nil && p == "" {
+                b.Error("impossible")
+            }
+        }
+        b.StopTimer()
+    }
+
+#.code go/src/net/http/server_test.go /START OMIT/,/END OMIT/
+
+* Fuzzing
+go/src/encoding/json/fold_test.go
+
+    func FuzzEqualFold(f *testing.F) {
+        for _, ss := range [][2]string{
+            {"", ""},
+            {"123abc", "123ABC"},
+            {"αβδ", "ΑΒΔ"},
+            {"abc", "xyz"},
+            // ...
+            {"DESKey", "aeskey"},
+            {"AES Key", "aeskey"},
+        } {
+            f.Add([]byte(ss[0]), []byte(ss[1]))
+        }
+        equalFold := func(x, y []byte) bool { return string(foldName(x)) == string(foldName(y)) }
+        f.Fuzz(func(t *testing.T, x, y []byte) {
+            got := equalFold(x, y)
+            want := bytes.EqualFold(x, y)
+            if got != want {
+                t.Errorf("equalFold(%q, %q) = %v, want %v", x, y, got, want)
+            }
+        })
+    }
+
+#.code go/src/encoding/json/fold_test.go /START OMIT/,/END OMIT/
+
+* Fuzzing test cases
+		{"abc", "XYZ"},
+		{"1", "2"},
+		{"hello, world!", "hello, world!"},
+		{"hello, world!", "Hello, World!"},
+		{"hello, world!", "HELLO, WORLD!"},
+		{"hello, world!", "jello, world!"},
+		{"γειά, κόσμε!", "γειά, κόσμε!"},
+		{"γειά, κόσμε!", "Γειά, Κόσμε!"},
+		{"γειά, κόσμε!", "ΓΕΙΆ, ΚΌΣΜΕ!"},
+		{"γειά, κόσμε!", "ΛΕΙΆ, ΚΌΣΜΕ!"},
+		{"AESKey", "aesKey"},
+		{"AESKEY", "aes_key"},
+		{"aes_key", "AES_KEY"},
+		{"AES_KEY", "aes-key"},
+		{"aes-key", "AES-KEY"},
+		{"AES-KEY", "aesKey"},
+		{"aesKey", "AesKey"},
+		{"AesKey", "AESKey"},
+		{"AESKey", "aeskey"},
+
+* Example tests
+TODO: example
+
+* Parallel
+t.Parallel
+
+* Data race
+TODO
+
+* Goroutine leaks
+TODO
+
+* Fixtures
+TODO
+newEnv
+t.Cleanup
+
+* Coverage
+TODO
+go test -cover
+
+* Service tests
+TODO: picture
+
+* Mocks and fakes
+(Test doubles)
+github.com/golang/mock/gomock
+github.com/vektra/mockery
+
+* End-to-end tests
+TODO: picture
+
+
+* Test vibes
+Bad:
+
+- Long
+- flaky
+- brittle
+
+Good:
+
+- well named
+- isolated
+- fast
+
+* Overall Recommendations
+TODO
